@@ -277,12 +277,8 @@ if __name__ == "__main__":
     toolkit_version = get_package_version("tpu_mlir")
     logger.info(f"Toolkit Version: {toolkit_version}")
     work_dir = f"outputs/{target}/{toolkit_version}"
-    compiled_models = f"models/{target}/{toolkit_version}"
     if not os.path.exists(work_dir):
         os.makedirs(work_dir)
-    if not os.path.exists(compiled_models):
-        os.makedirs(compiled_models)
-
     onnx_files = glob.glob(os.path.join(models_dir, "**/*.onnx"), recursive=True)
     sorted_file_list = natsorted(onnx_files, key=os.path.basename)
     for idx, filepath in enumerate(sorted_file_list):
