@@ -1,0 +1,224 @@
+#version: "3"
+
+services:
+  edgex:
+    image: 113.100.143.90:8091/dengine/dengine:dev
+    hostname: edgex
+    container_name: nnp4xx_xingwg
+    restart: always
+    privileged: true
+    tty: true
+    environment:
+      - NNP=nnp400
+      - LD_LIBRARY_PATH=/DEngine/tyhcp/client/x64-linux-gcc7.5/lib:/DEngine/tydpf/client/x64-linux-gcc7.5/lib
+      - ARM_C_COMPILER=/DEngine/toolchains/gcc-arm-9.2-2019.12-x86_64-aarch64-none-linux-gnu/bin/aarch64-none-linux-gnu-gcc
+    working_dir: /DEngine
+    devices:
+      - /dev:/dev
+    volumes:
+      - /dato/xingwg/DEngine_edge10:/DEngine
+      - /dato/xingwg/tyassist:/DEngine/tyassist
+      - /dato/xingwg/tymodelzoo:/DEngine/tymodelzoo
+      - /dato/xingwg/modelzoo:/DEngine/tyexamples/modelzoo
+      - /dato/xingwg/models:/DEngine/models
+      - /data/xingwg/gdino_lst:/gdino_lst
+        
+  tytvm:
+    image: 113.100.143.90:8091/dengine/tytvm:v0.36
+    hostname: tytvm_nnp300
+    container_name: tvm_nnp300_xingwg
+    restart: always
+    privileged: true
+    tty: true
+    working_dir: /DEngine/tytvm
+    devices:
+      - /dev:/dev
+    volumes:
+      - /dato/xingwg/tyassist:/DEngine/tyassist
+      - /dato/xingwg/tymodelzoo:/DEngine/tymodelzoo
+      - /dato/xingwg/DEngine_nnp300:/DEngine
+      - /dato/xingwg/models:/DEngine/models
+
+  tyhcp:
+    image: 113.100.143.90:8091/dengine/tyhcp:v1.21
+    hostname: tyhcp_nnp300
+    container_name: hcp_nnp300_xingwg
+    restart: always
+    privileged: true
+    tty: true
+    working_dir: /DEngine/tyhcp
+    environment:
+      - DUMP_SERVER_IP=192.168.33.101
+      - DUMP_SERVER_PORT=${DUMP_SERVER_PORT:-19300}
+    devices:
+      - /dev:/dev
+    volumes:
+      - /dato/xingwg/models:/DEngine/models
+      - /dato/xingwg/DEngine_nnp300:/DEngine
+      - /dato/xingwg/tyassist:/DEngine/tyassist
+      - /dato/xingwg/tymodelzoo:/DEngine/tymodelzoo
+      - /dato/xingwg/modelzoo:/DEngine/tyexamples/modelzoo
+    ports:
+      - ${DUMP_SERVER_PORT:-19300}:9091
+
+  tytvm315:
+    image: 113.100.143.90:8091/dengine/tytvm:v0.36
+    hostname: tytvm_nnp315
+    container_name: tvm_nnp315_xingwg
+    restart: always
+    privileged: true
+    tty: true
+    working_dir: /DEngine/tytvm
+    devices:
+      - /dev:/dev
+    volumes:
+      - /dato/xingwg/DEngine_nnp315:/DEngine
+      - /dato/xingwg/tyassist:/DEngine/tyassist
+      - /dato/xingwg/tymodelzoo:/DEngine/tymodelzoo
+      - /dato/xingwg/models:/DEngine/models
+
+  tyhcp315:
+    image: 113.100.143.90:8091/dengine/tyhcp:v1.21
+    hostname: tyhcp_nnp315
+    container_name: hcp_nnp315_xingwg
+    restart: always
+    privileged: true
+    tty: true
+    working_dir: /DEngine/tyhcp
+    environment:
+      - DUMP_SERVER_IP=192.168.33.101
+      - DUMP_SERVER_PORT=${DUMP_SERVER_PORT:-19315}
+    devices:
+      - /dev:/dev
+    volumes:
+      - /dato/xingwg/models:/DEngine/models
+      - /dato/xingwg/DEngine_nnp315:/DEngine
+      - /dato/xingwg/tyassist:/DEngine/tyassist
+      - /dato/xingwg/tymodelzoo:/DEngine/tymodelzoo
+      - /dato/xingwg/modelzoo:/DEngine/tyexamples/modelzoo
+    ports:
+      - ${DUMP_SERVER_PORT:-19315}:9091
+
+  tytvm310:
+    image: 113.100.143.90:8091/dengine/tytvm:v0.36
+    hostname: tytvm_nnp310
+    container_name: tvm_nnp310_xingwg
+    restart: always
+    privileged: true
+    tty: true
+    working_dir: /DEngine/tytvm
+    devices:
+      - /dev:/dev
+    volumes:
+      - /dato/xingwg/DEngine_nnp310:/DEngine
+      - /dato/xingwg/tyassist:/DEngine/tyassist
+      - /dato/xingwg/tymodelzoo:/DEngine/tymodelzoo
+      - /dato/xingwg/models:/DEngine/models
+
+  tyhcp310:
+    image: 113.100.143.90:8091/dengine/tyhcp:v1.21
+    hostname: tyhcp_nnp310
+    container_name: hcp_nnp310_xingwg
+    restart: always
+    privileged: true
+    tty: true
+    working_dir: /DEngine/tyhcp
+    environment:
+      - DUMP_SERVER_IP=192.168.33.101
+      - DUMP_SERVER_PORT=${DUMP_SERVER_PORT:-19310}
+    devices:
+      - /dev:/dev
+    volumes:
+      - /dato/xingwg/models:/DEngine/models
+      - /dato/xingwg/DEngine_nnp310:/DEngine
+      - /dato/xingwg/tyassist:/DEngine/tyassist
+      - /dato/xingwg/tymodelzoo:/DEngine/tymodelzoo
+      - /dato/xingwg/modelzoo:/DEngine/tyexamples/modelzoo
+    ports:
+      - ${DUMP_SERVER_PORT:-19310}:9091
+
+  tytvm3020:
+    image: 113.100.143.90:8091/dengine/tytvm:v0.36
+    hostname: tytvm_nnp3020
+    container_name: tvm_nnp3020_xingwg
+    restart: always
+    privileged: true
+    tty: true
+    working_dir: /DEngine/tytvm
+    devices:
+      - /dev:/dev
+    volumes:
+      - /dato/xingwg/DEngine_nnp3020:/DEngine
+      - /dato/xingwg/tyassist:/DEngine/tyassist
+      - /dato/xingwg/tymodelzoo:/DEngine/tymodelzoo
+      - /dato/xingwg/models:/DEngine/models
+
+  tyhcp3020:
+    image: 113.100.143.90:8091/dengine/tyhcp:v1.21
+    hostname: tyhcp_nnp3020
+    container_name: hcp_nnp3020_xingwg
+    restart: always
+    privileged: true
+    tty: true
+    working_dir: /DEngine/tyhcp
+    environment:
+      - DUMP_SERVER_IP=192.168.33.101
+      - DUMP_SERVER_PORT=${DUMP_SERVER_PORT:-13020}
+    devices:
+      - /dev:/dev
+    volumes:
+      - /dato/xingwg/models:/DEngine/models
+      - /dato/xingwg/DEngine_nnp3020:/DEngine
+      - /dato/xingwg/tyassist:/DEngine/tyassist
+      - /dato/xingwg/tymodelzoo:/DEngine/tymodelzoo
+      - /dato/xingwg/modelzoo:/DEngine/tyexamples/modelzoo
+    ports:
+      - ${DUMP_SERVER_PORT:-13020}:9091
+
+  pulsar2:
+    image: pulsar2:2.4
+    restart: always
+    container_name: pulsar2
+    hostname: pulsar2
+    tty: true
+    working_dir: /models
+    volumes:
+      - /dato/xingwg/models:/models
+      
+  mysql:
+    image: mysql:8.2.0
+    restart: always
+    container_name: mysql
+    hostname: mysql
+    environment:
+      MYSQL_ROOT_PASSWORD: 10086
+    ports:
+      - "3306:3306"
+    command:
+      - "--lower_case_table_names=1"
+    volumes:
+      - /dato/xingwg/models/db:/var/lib/mysql
+
+  rknn:
+    image: rknn-toolkit2:v2.1.0
+    restart: always
+    container_name: rknn
+    hostname: rknn
+    privileged: true
+    tty: true
+    working_dir: /models
+    volumes:
+      - /dato/xingwg/models:/models
+      - /dato/xingwg/tymodelzoo/data:/data
+
+  sophgo:
+    image: sophgo/tpuc_dev:v3.2
+    restart: always
+    container_name: sophgo
+    hostname: sophgo
+    privileged: true
+    tty: true
+    working_dir: /models
+    volumes:
+      - /dato/xingwg/models:/models
+      - /dato/xingwg/tymodelzoo/data:/data
