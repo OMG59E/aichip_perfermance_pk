@@ -19,7 +19,8 @@ from loguru import logger
 from fabric import Connection
 from natsort import natsorted
 from datetime import datetime
-from sqlalchemy import Column, Integer, DateTime, String, BOOLEAN, TEXT, Float, inspect
+from sqlalchemy.dialects.mysql import LONGTEXT
+from sqlalchemy import Column, Integer, DateTime, String, BOOLEAN, Float, inspect
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy.ext.declarative import declarative_base
 
@@ -52,7 +53,7 @@ class Models(Base):
     model_path = Column(String(512), comment="模型路径")
     target = Column(String(512), comment="目标芯片")
     version = Column(String(512), comment="工具链版本")
-    msg = Column(TEXT, comment="编译信息")
+    msg = Column(LONGTEXT, comment="编译信息")
     num_core = Column(String(512), comment="配置算力")
     build_time = Column(DateTime, comment="编译时间")
     build_span = Column(String(512), comment="编译耗时")
@@ -87,7 +88,7 @@ def get_package_version(package_name):
         return f"Package {package_name} is not installed."
     
     
-def gen_data(filename, save_dir="data"):
+def gen_data(filename):
     try:
         # 检查onnx是否仅为batch维度动态
         graph = gs.import_onnx(onnx.load(filename))
@@ -230,7 +231,6 @@ def get_latency(filename, md5_code, target, num_core):
         password = "linaro"
         work_dir = "/home/linaro/"
         num_iter = 1000
-        key = "calculate  time(s): "
         bmodel = f"{basename}_{target}_{num_core}core_int8_sym_{md5_code}.bmodel"
         with Connection(host=f"{username}@{ip_addr}", connect_kwargs={"password": password}) as c:
             c.put(bmodel, work_dir)
@@ -243,8 +243,8 @@ def get_latency(filename, md5_code, target, num_core):
                 return 0, msg
             output = result.stdout.strip()
             logger.info(f"Command Output: {output}")
-            idx = output.find(key)
-            latency = float(output[idx + len(key) : idx + len(key) + 8])
+            line = output.splitlines()[-3]
+            latency = float(line.strip().split(" ")[-1])
             latency = latency * 1000 / num_iter
             logger.info(f"Exit Code: {result.return_code}")
             c.run(f"rm {os.path.join(work_dir, bmodel)}", hide=True)
@@ -356,6 +356,7 @@ if __name__ == "__main__":
                 session.add(model)
                 session.commit()
                 continue
+            build_span = int(datetime.timestamp(datetime.now()) - datetime.timestamp(build_time))
             latency, msg = get_latency(filename, md5_code, target, num_core)
             if latency == 0:
                 os.chdir(old_dir)
@@ -366,7 +367,7 @@ if __name__ == "__main__":
             os.chdir(old_dir)
             bmodel = f"{basename}_{target}_{num_core}core_int8_sym_{md5_code}.bmodel"
             compiled_model_path = os.path.join(model_dir, bmodel)
-            model.build_span = int(datetime.timestamp(datetime.now()) - datetime.timestamp(build_time))
+            model.build_span = build_span
             model.compiled_model_path = compiled_model_path
             model.compiled_model_md5 = get_md5_code(compiled_model_path)
             model.latency = latency
