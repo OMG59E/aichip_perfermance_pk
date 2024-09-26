@@ -48,8 +48,8 @@ class Models(Base):
     __tablename__ = "axera"
     __table_args__ = {"extend_existing": True, "mysql_charset": "utf8"}
     id = Column(Integer, primary_key=True, autoincrement=True)
-    model_name = Column(String(512), index=True, comment="模型名")
     desc = Column(String(512), comment="任务描述")
+    model_name = Column(String(512), index=True, comment="模型名")
     md5_code = Column(String(512), comment="模型md5码")
     model_path = Column(String(512), comment="模型路径")
     target = Column(String(512), comment="目标芯片")
