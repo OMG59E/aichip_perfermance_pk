@@ -1,0 +1,16 @@
+onnx_graphsurgeon
+flask
+sqlalchemy==1.4.26
+pymysql
+cryptography
+flask-sqlalchemy
+dash
+dash_ag_grid
+dash-bootstrap-components
+dash-core-components
+dash-html-components
+dash-table
+natsort
+fabric
+loguru
+onnxsim
