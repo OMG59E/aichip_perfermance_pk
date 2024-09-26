@@ -62,14 +62,10 @@ class Models(Base):
     compiled_model_md5 = Column(String(512), comment="编译后模型MD5")
     
 
-MAX_MEMORY = 28 * 1024 * 1024 * 1024  # GB
-
-def set_memory_limit(max_mem):
-    def limit():
-        soft, hard = resource.getrlimit(resource.RLIMIT_AS)
-        resource.setrlimit(resource.RLIMIT_AS, (max_mem, hard))
-    return limit
-
+def set_memory_limit():
+    max_memory = 32 * 1024 * 1024 * 1024 # 32GB
+    resource.setrlimit(resource.RLIMIT_AS, (max_memory, resource.RLIM_INFINITY))
+    
 
 def get_md5_code(filepath):
     md5 = hashlib.md5()
