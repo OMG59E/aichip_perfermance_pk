@@ -235,13 +235,10 @@ def check_onnx_only_batch_dynamic(onnx_path):
 
 def get_version():
     try:
-        model_transform_cmd = ["pulsar2", "version"]
-        res = subprocess.run(model_transform_cmd, capture_output=True, text=True, check=True, timeout=120)
-        text = str(res.stdout)
-        key = "version: "
-        key_size = len(key)
-        idx = text.find(key)
-        version = text[key_size + idx : key_size + idx + 3]
+        pulsar_cmd = ["pulsar2", "version"]
+        res = subprocess.run(pulsar_cmd, capture_output=True, text=True, check=True, timeout=120)
+        lines = str(res.stdout).splitlines()
+        version = lines[0].strip().split()[-1]
         return version
     except subprocess.CalledProcessError as e:
         logger.error(f"Return code: {e.returncode}")
@@ -349,8 +346,10 @@ if __name__ == "__main__":
             new_basename, ext = os.path.splitext(new_filename)
             if not os.path.exists(new_filename):
                 # onnxsim 改为静态
-                model_simp, check = simplify(
-                    onnx.load(filename), overwrite_input_shapes=input_shapes)
+                try:
+                    model_simp, check = simplify(onnx.load(filename), overwrite_input_shapes=input_shapes)
+                except Exception as e:
+                    check = False
                 if not check:
                     os.chdir(old_dir)
                     msg = f"Failed to onnxsim model: {filename}"
