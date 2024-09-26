@@ -63,13 +63,9 @@ class Models(Base):
     compiled_model_md5 = Column(String(512), comment="编译后模型MD5")
 
 
-MAX_MEMORY = 28 * 1024 * 1024 * 1024  # GB
-
-def set_memory_limit(max_mem):
-    def limit():
-        soft, hard = resource.getrlimit(resource.RLIMIT_AS)
-        resource.setrlimit(resource.RLIMIT_AS, (max_mem, hard))
-    return limit
+def set_memory_limit():
+    max_memory = 32 * 1024 * 1024 * 1024 # 32GB
+    resource.setrlimit(resource.RLIMIT_AS, (max_memory, resource.RLIM_INFINITY))
 
 
 def build_model():
@@ -249,7 +245,7 @@ def get_version():
 
 
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description="Model build tool")
+    parser = argparse.ArgumentParser(description="AXERA model build tool")
     parser.add_argument("--models", "-m", type=str, required=True, help="Please specify a onnx model dir")
     parser.add_argument("--target", "-t", type=str, required=True, choices=("AX650", ), help="Please specify a chip target")
     parser.add_argument("--desc", "-d", type=str, required=True, help="Please specify a task desc")
@@ -355,8 +351,11 @@ if __name__ == "__main__":
                     msg = f"Failed to onnxsim model: {filename}"
                     model.msg = msg
                     logger.error(msg)
+                    session.add(model)
+                    session.commit()
                     continue
                 onnx.save(model_simp, new_filename)
+                logger.info(f"Simplify {filename} to {new_filename}")
             # 更新模型文件名
             filename = new_filename
             basename = new_basename
@@ -378,7 +377,7 @@ if __name__ == "__main__":
             session.commit()
             continue
         model_name = f"{basename}_{target}_{npu_mode}_v{toolkit_version}_{md5_code}.axmodel"
-        relative_model_path = os.path.join("outputs" ,model_name)
+        relative_model_path = os.path.join("outputs", model_name)
         if not os.path.exists(relative_model_path):
             success, msg = build_model()
             model.build_span = str(int(datetime.timestamp(datetime.now()) - datetime.timestamp(build_time)))
