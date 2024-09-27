@@ -55,7 +55,7 @@ class Models(Base):
     model_path = Column(String(512), comment="模型路径")
     target = Column(String(512), comment="目标芯片")
     version = Column(String(512), comment="工具链版本")
-    msg = Column(String(10240), comment="编译信息")
+    msg = Column(LONGTEXT, comment="编译信息")
     build_time = Column(DateTime, comment="编译开始时间")
     build_span = Column(String(512), comment="编译耗时")
     latency_1core = Column(Float, default=0, comment="单核时延, 单线程单核跑1b模型")
@@ -251,7 +251,7 @@ def get_latency_throughput(model_name):
     except Exception as e:
         msg = f"Run model exception:\n{traceback.format_exc()}"
         logger.error(msg)
-        return 0, msg
+        return 0, 0, 0, msg
     
     
 if __name__ == "__main__":
