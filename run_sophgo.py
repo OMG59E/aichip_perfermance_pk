@@ -220,21 +220,24 @@ def build_model(filename, md5_code, target, num_core=1):
     
 
 def get_latency(filename, md5_code, target, num_core):
+    basename, ext = os.path.splitext(filename)
+    ip_addr = "192.168.33.35"
+    username = "linaro"
+    password = "linaro"
+    remote_work_dir = "/home/linaro/"
+    key_filename = "/root/.ssh/id_rsa"
+    num_iter = 1000
+    bmodel = f"{basename}_{target}_{num_core}core_int8_sym_{md5_code}.bmodel"
+    remote_model_path = f"/home/linaro/{bmodel}"
     try:
-        basename, ext = os.path.splitext(filename)
-        ip_addr = "192.168.33.35"
-        username = "linaro"
-        password = "linaro"
-        work_dir = "/home/linaro/"
-        num_iter = 1000
-        bmodel = f"{basename}_{target}_{num_core}core_int8_sym_{md5_code}.bmodel"
-        with Connection(host=f"{username}@{ip_addr}", connect_kwargs={"password": password}) as c:
-            c.put(bmodel, work_dir)
-            logger.info(f"Upload model: {bmodel} to {work_dir}")
-            result = c.run(f"/opt/sophon/libsophon-current/bin/bmrt_test --calculate_times {num_iter} --bmodel {os.path.join(work_dir, bmodel)}", hide=True)
+        with Connection(host=f"{username}@{ip_addr}", connect_kwargs={"key_filename": key_filename}) as c:
+            logger.info(f"Upload model: {bmodel} to {remote_work_dir}")
+            c.put(bmodel, remote_work_dir)
+            result = c.run(f"/opt/sophon/libsophon-current/bin/bmrt_test --calculate_times {num_iter} --bmodel {remote_model_path}", hide=True)
             error = result.stderr.strip()
             if error:
-                msg = f"Command Error: {error}"
+                c.run(f"rm {remote_model_path}", hide=True)
+                msg = f"Command Error: {error}, and delete remote model: {remote_model_path}"
                 logger.error(msg)
                 return 0, msg
             output = result.stdout.strip()
@@ -243,11 +246,13 @@ def get_latency(filename, md5_code, target, num_core):
             latency = float(line.strip().split(" ")[-1])
             latency = latency * 1000 / num_iter
             logger.info(f"Exit Code: {result.return_code}")
-            c.run(f"rm {os.path.join(work_dir, bmodel)}", hide=True)
-            logger.info(f"Delete model: {os.path.join(work_dir, bmodel)}")
+            c.run(f"rm {remote_model_path}", hide=True)
+            logger.info(f"Delete remote model: {remote_model_path}")
             return latency, "ok"
     except Exception as e:
-        msg = f"Run model exception:\n{traceback.format_exc()}"
+        with Connection(host=f"{username}@{ip_addr}", connect_kwargs={"key_filename": key_filename}) as c:
+            c.run(f"rm {remote_model_path}", hide=True)
+        msg = f"Run model exception, and delete remote model: {remote_model_path}:\n{traceback.format_exc()}"
         logger.error(msg)
         return 0, msg
 
@@ -286,6 +291,12 @@ if __name__ == "__main__":
         filename = os.path.basename(filepath)
         basename, ext = os.path.splitext(filename)
         for num_core in num_cores:
+            model_dir = f"{work_dir}/{basename}_{md5_code}/"
+            if not os.path.exists(model_dir):
+                os.makedirs(model_dir)
+            if not os.path.exists(os.path.join(model_dir, filename)):
+                shutil.copy(filepath, model_dir)
+            bmodel = f"{basename}_{target}_{num_core}core_int8_sym_{md5_code}.bmodel"
             # 检查该模型已经在数据库
             res = session.query(Models).filter(
                 Models.md5_code == md5_code,
@@ -296,8 +307,23 @@ if __name__ == "__main__":
             if res:
                 if res.model_path == filepath:
                     logger.info(f"MD5: {md5_code}, Path: {filepath}")
-                    if res.msg == "ok" and os.path.exists(res.compiled_model_path) and res.latency == 0:
-                        pass  
+                    if bmodel in  ["detr_op11_900x1600_bm1688_2core_int8_sym_583397d68579a08f7cef3d710c5af7e0.bmodel",
+                                   "detr_r50_8x2_150e_coco_bm1688_2core_int8_sym_7813210d45ccc0f6925ee0d1c79698f8.bmodel",
+                                   "fastbev_m0_r18_s256x704_v200x200x4_c192_d2_f4_P3_demo_post_bm1688_2core_int8_sym_e81155ab869ec43a42906db6975bb906.bmodel"]:
+                        continue
+                    if os.path.exists(os.path.join(model_dir, bmodel)) and res.latency == 0:
+                        old_dir = os.getcwd()
+                        os.chdir(model_dir)
+                        # 模型编译生成，但是远程板子推理失败
+                        latency, msg = get_latency(filename, md5_code, target, num_core)
+                        if latency != 0:
+                            res.msg = "ok"
+                            res.latency = latency
+                        else:
+                            res.msg = msg
+                        os.chdir(old_dir)
+                        session.add(res)
+                        session.commit()
                 else:
                     # 路径不一致，直接复制
                     model = Models()
@@ -328,12 +354,7 @@ if __name__ == "__main__":
             model.build_time = build_time
             model.num_core = num_core
             model.target = target
-        
-            model_dir = f"{work_dir}/{basename}_{md5_code}/"
-            if not os.path.exists(model_dir):
-                os.makedirs(model_dir)
-            if not os.path.exists(os.path.join(model_dir, filename)):
-                shutil.copy(filepath, model_dir)
+
             old_dir = os.getcwd()
             os.chdir(model_dir)
             logger.info(f"Change work dir to {model_dir}")
@@ -352,7 +373,9 @@ if __name__ == "__main__":
                 session.add(model)
                 session.commit()
                 continue
-            build_span = int(datetime.timestamp(datetime.now()) - datetime.timestamp(build_time))
+            model.build_span = int(datetime.timestamp(datetime.now()) - datetime.timestamp(build_time))
+            session.add(model)
+            session.commit()
             latency, msg = get_latency(filename, md5_code, target, num_core)
             if latency == 0:
                 os.chdir(old_dir)
@@ -361,9 +384,7 @@ if __name__ == "__main__":
                 session.commit()
                 continue
             os.chdir(old_dir)
-            bmodel = f"{basename}_{target}_{num_core}core_int8_sym_{md5_code}.bmodel"
             compiled_model_path = os.path.join(model_dir, bmodel)
-            model.build_span = build_span
             model.compiled_model_path = compiled_model_path
             model.compiled_model_md5 = get_md5_code(compiled_model_path)
             model.latency = latency
