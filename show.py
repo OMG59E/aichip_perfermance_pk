@@ -210,6 +210,7 @@ app.layout = html.Div([
                             # "width": "100vw",   # 宽度适应视窗宽度
                         },
                         csvExportParams={"filename": "edgex.csv"},
+                        dashGridOptions = {"enableCellTextSelection": True, "ensureDomOrder": True}
                     ),
                     dcc.Interval(
                         id="update_edgex",
@@ -245,6 +246,7 @@ app.layout = html.Div([
                             # "width": "100vw",   # 宽度适应视窗宽度
                         },
                         csvExportParams={"filename": "axera.csv"},
+                        dashGridOptions = {"enableCellTextSelection": True, "ensureDomOrder": True}
                     ),
                     dcc.Interval(
                         id="update_axera",
@@ -280,6 +282,7 @@ app.layout = html.Div([
                             # "width": "100vw",   # 宽度适应视窗宽度
                         },
                         csvExportParams={"filename": "sophgo.csv"},
+                        dashGridOptions = {"enableCellTextSelection": True, "ensureDomOrder": True}
                     ),
                     dcc.Interval(
                         id="update_sophgo",
@@ -315,6 +318,7 @@ app.layout = html.Div([
                             # "width": "100vw",   # 宽度适应视窗宽度
                         },
                         csvExportParams={"filename": "rockchip.csv"},
+                        dashGridOptions = {"enableCellTextSelection": True, "ensureDomOrder": True}
                     ),
                     dcc.Interval(
                         id="update_rockchip",
