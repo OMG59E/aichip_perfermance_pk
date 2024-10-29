@@ -161,22 +161,22 @@ def gen_data(filename):
     
 
 def get_latency(model_name):
+    ip_addr = "192.168.33.70"
+    username = "root"
+    password = "root"
+    remote_work_dir = "/root/"
+    key_filename = "/root/.ssh/id_rsa"
+    num_iter = 1000
+    remote_model_path = os.path.join(remote_work_dir, model_name)
     try:
-        ip_addr = "192.168.33.70"
-        username = "root"
-        password = "root"
-        remote_work_dir = "/root/"
-        key_filename = "/root/.ssh/id_rsa"
-        num_iter = 1000
-        key = "avg =   "
         with Connection(host=f"{username}@{ip_addr}", connect_kwargs={"key_filename": key_filename}) as c:
             src_model_path = os.path.join("outputs", model_name)
             c.put(src_model_path, remote_work_dir)
             logger.info(f"Upload model: {src_model_path} to {remote_work_dir}")
-            remote_model_path = os.path.join(remote_work_dir, model_name)
             result = c.run(f"/opt/bin/ax_run_model -m {remote_model_path} -w 5 -r {num_iter}", hide=True)
             error = result.stderr.strip()
             if error:
+                c.run(f"rm {remote_model_path}", hide=True)
                 msg = f"Command Error:\n{error}"
                 logger.error(msg)
                 return 0, msg
@@ -184,12 +184,13 @@ def get_latency(model_name):
             logger.info(f"Command Output:\n{output}")
             line = output.splitlines()[-2]
             latency = float(line.split(" ")[-2])
-            # latency = float(line[idx + len(key) : -4])
             logger.info(f"Exit Code: {result.return_code}")
             c.run(f"rm {remote_model_path}", hide=True)
             logger.info(f"Delete model: {remote_model_path}")
             return latency, "ok"
     except Exception as e:
+        with Connection(host=f"{username}@{ip_addr}", connect_kwargs={"key_filename": key_filename}) as c:
+            c.run(f"rm {remote_model_path}", hide=True)
         msg = f"Run model exception:\n{traceback.format_exc()}"
         logger.error(msg)
         return 0, msg
@@ -276,6 +277,15 @@ if __name__ == "__main__":
         md5_code = get_md5_code(filepath)
         filename = os.path.basename(filepath)
         basename, ext = os.path.splitext(filename)
+        model_work_dir = f"{work_dir}/{basename}_{md5_code}/"
+        if not os.path.exists(model_work_dir):
+            os.makedirs(model_work_dir)
+        dst_onnx_path = os.path.join(model_work_dir, filename)
+        if not os.path.exists(dst_onnx_path):
+            shutil.copy(filepath, model_work_dir)
+        model_name = f"{basename}_{target}_{npu_mode}_v{toolkit_version}_{md5_code}.axmodel"
+        relative_model_path = os.path.join("outputs", model_name)
+        compiled_model_path = os.path.join(model_work_dir, relative_model_path) 
         # 检查该模型是不是已经入库
         res = session.query(Models).filter(
             Models.md5_code == md5_code,
@@ -286,7 +296,17 @@ if __name__ == "__main__":
         if res:
             if res.model_path == filepath:
                 logger.info(f"MD5: {md5_code}, Path: {filepath}")
-                pass
+                if os.path.exists(compiled_model_path) and res.latency == 0:
+                    old_dir = os.getcwd()
+                    os.chdir(model_work_dir)
+                    # 模型编译生成，但是远程板子推理失败
+                    latency, msg = get_latency(model_name)
+                    if latency != 0:
+                        res.msg = "ok"
+                        res.latency = latency
+                        session.add(res)
+                        session.commit()
+                    os.chdir(old_dir)
             else:
                 # 路径不一致，直接复制
                 model = Models()
@@ -317,15 +337,7 @@ if __name__ == "__main__":
         build_time = datetime.now()
         model.build_time = build_time
         model.npu_mode = npu_mode
-        model.target = target
-        
-        model_work_dir = f"{work_dir}/{basename}_{md5_code}/"
-        if not os.path.exists(model_work_dir):
-            os.makedirs(model_work_dir)
-        dst_onnx_path = os.path.join(model_work_dir, filename)
-        if not os.path.exists(dst_onnx_path):
-            shutil.copy(filepath, model_work_dir)
-            
+        model.target = target            
         old_dir = os.getcwd()
         os.chdir(model_work_dir)
         logger.info(f"Change work dir to {model_work_dir}")
@@ -376,8 +388,6 @@ if __name__ == "__main__":
             session.add(model)
             session.commit()
             continue
-        model_name = f"{basename}_{target}_{npu_mode}_v{toolkit_version}_{md5_code}.axmodel"
-        relative_model_path = os.path.join("outputs", model_name)
         if not os.path.exists(relative_model_path):
             success, msg = build_model()
             model.build_span = str(int(datetime.timestamp(datetime.now()) - datetime.timestamp(build_time)))
@@ -398,7 +408,6 @@ if __name__ == "__main__":
             session.commit()
             continue
         os.chdir(old_dir)
-        compiled_model_path = os.path.join(model_work_dir, relative_model_path)
         model.compiled_model_path = compiled_model_path
         model.compiled_model_md5 = get_md5_code(compiled_model_path)
         model.latency = latency

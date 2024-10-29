@@ -72,7 +72,10 @@ def build_model(target):
         build_cmd = ["python", "-m" "rknn.api.rknn_convert", "-t", target, "-i", "config.yml", "-o", "."]
         res = subprocess.run(build_cmd, capture_output=True, text=True, check=True, timeout=7200)  # 2小时不结束视为超时
         if res.returncode == 0:
-            logger.info(f"success:\n{res.stdout}")
+            msg = str(res.stdout)
+            if msg.find("rknn build fail") != -1:
+                return False, msg
+            logger.info(f"success:\n{msg}")
             return True, "ok"
         else:
             msg = str(res.stderr)
@@ -88,30 +91,34 @@ def build_model(target):
         
 def gen_cfg(filename, md5_code, target, version):
     try:
-        graph = gs.import_onnx(onnx.load(filename))
-        input_names = [node.name for node in graph.inputs]
-        input_shapes = [list(node.shape) for node in graph.inputs]
-        input_dtypes = [str(node.dtype) for node in graph.inputs]
-        basename, ext = os.path.splitext(filename)
-        config = dict()
-        config = {
-            "models": {
-                "name": "{}_{}_v{}_{}.rknn".format(basename, target, version, md5_code),
-                "platform": "onnx",
-                "model_file_path": filename,
-                "quantize": True,
-                "dataset": "dataset.txt",
-                "configs": {
-                    "mean_values": None,
-                    "std_values": None,
-                    "quantized_dtype": "asymmetric_quantized-8",
-                    "quant_img_RGB2BGR": False,
-                    "quantized_algorithm": "normal"
-                }
-            },
-        }
-        with open("config.yml", "w") as f:
-            yaml.dump(config, f, default_flow_style=False, sort_keys=True)
+        cfg_path = "config.yml"
+        if not os.path.exists(cfg_path):
+            graph = gs.import_onnx(onnx.load(filename))
+            input_names = [node.name for node in graph.inputs]
+            input_shapes = [list(node.shape) for node in graph.inputs]
+            input_dtypes = [str(node.dtype) for node in graph.inputs]
+            basename, ext = os.path.splitext(filename)
+            config = dict()
+            config = {
+                "models": {
+                    "name": "{}_{}_v{}_{}.rknn".format(basename, target, version, md5_code),
+                    "platform": "onnx",
+                    "model_file_path": filename,
+                    "quantize": True,
+                    "dataset": "dataset.txt",
+                    "configs": {
+                        "mean_values": None,
+                        "std_values": None,
+                        "quantized_dtype": "asymmetric_quantized-8",
+                        "quant_img_RGB2BGR": False,
+                        "quantized_algorithm": "normal"
+                    }
+                },
+            }
+            with open(cfg_path, "w") as f:
+                yaml.dump(config, f, default_flow_style=False, sort_keys=True)
+        else:
+            logger.info(f"Cfg exist, model: {filename}")
         return True, "ok"
     except Exception as e:
         msg = f"Failed to gen config:\n{e}"
@@ -196,20 +203,24 @@ def get_md5_code(filepath):
 
 
 def get_latency_throughput(model_name):
+    ip_addr = "192.168.33.249"
+    username = "radxa"
+    password = "radxa"
+    remote_work_dir = "/home/radxa/"
+    key_filename = "/root/.ssh/id_rsa"
+    num_iter = 100
+    remote_model_path = os.path.join(remote_work_dir, model_name)
     try:
-        ip_addr = "192.168.33.249"
-        username = "radxa"
-        password = "radxa"
-        remote_work_dir = "/home/radxa/"
-        key_filename = "/root/.ssh/id_rsa"
-        num_iter = 1000
         with Connection(host=f"{username}@{ip_addr}", connect_kwargs={"key_filename": key_filename}) as c:
-            c.put(model_name, remote_work_dir)
             logger.info(f"Upload model: {model_name} to {remote_work_dir}")
-            remote_model_path = os.path.join(remote_work_dir, model_name)
-            result = c.run(f"./rk_run_model {remote_model_path} 0 {num_iter}", hide=True)
+            c.put(model_name, remote_work_dir)
+            run_cmd = f"./rk_run_model {remote_model_path} 0 {num_iter}"
+            logger.info(run_cmd)
+            # result = c.run(run_cmd, hide=True, timeout=7200, warn=True)
+            result = c.run(run_cmd, hide=True, warn=True)
             error = result.stderr.strip()
             if error:
+                c.run(f"rm {remote_model_path}", hide=True)
                 msg = f"Command Error:\n{error}"
                 logger.error(msg)
                 return 0, 0, 0, msg
@@ -220,9 +231,13 @@ def get_latency_throughput(model_name):
             latency_1core = float(latency_1core[:-2])
             logger.info(f"Exit Code: {result.return_code}")
             
-            result = c.run(f"./rk_run_model {remote_model_path} 3 {num_iter}", hide=True)
+            run_cmd = f"./rk_run_model {remote_model_path} 3 {num_iter}"
+            logger.info(run_cmd)
+            # result = c.run(run_cmd, hide=True, timeout=7200, warn=True)
+            result = c.run(run_cmd, hide=True, warn=True)
             error = result.stderr.strip()
             if error:
+                c.run(f"rm {remote_model_path}", hide=True)
                 msg = f"Command Error:\n{error}"
                 logger.error(msg)
                 return 0, 0, 0, msg
@@ -233,9 +248,13 @@ def get_latency_throughput(model_name):
             latency = float(latency[:-2])
             logger.info(f"Exit Code: {result.return_code}")
 
-            result = c.run(f"./rk_run_model {remote_model_path} 4 {num_iter}", hide=True)
+            run_cmd = f"./rk_run_model {remote_model_path} 4 {num_iter}"
+            logger.info(run_cmd)
+            # result = c.run(run_cmd, hide=True, timeout=7200, warn=True)
+            result = c.run(run_cmd, hide=True, warn=True)
             error = result.stderr.strip()
             if error:
+                c.run(f"rm {remote_model_path}", hide=True)
                 msg = f"Command Error:\n{error}"
                 logger.error(msg)
                 return 0, 0, 0, msg
@@ -249,6 +268,8 @@ def get_latency_throughput(model_name):
             logger.info(f"Delete model: {remote_model_path}")
             return latency_1core, latency, throughput, "ok"
     except Exception as e:
+        with Connection(host=f"{username}@{ip_addr}", connect_kwargs={"key_filename": key_filename}) as c:
+            c.run(f"rm {remote_model_path}", hide=True)
         msg = f"Run model exception:\n{traceback.format_exc()}"
         logger.error(msg)
         return 0, 0, 0, msg
@@ -397,10 +418,15 @@ if __name__ == "__main__":
         else:
             model.build_span = 0
         if target == "rk3588":
-            latency_1core, latency, throughput, msg = get_latency_throughput(rknn_name)
-            model.latency_1core = latency_1core
-            model.latency = latency
-            model.throughput = throughput
+            if rknn_name not in ["ch_PP-OCRv2_rec_infer_b1_rk3588_v2.1.0+708089d1_0ef3605e78c0329c54305f2454e4bcfc.rknn"]:
+                latency_1core, latency, throughput, msg = get_latency_throughput(rknn_name)
+                model.latency_1core = latency_1core
+                model.latency = latency
+                model.throughput = throughput
+            else:
+                logger.error(f"Skip: {rknn_name}")
+                os.chdir(old_dir)
+                continue
         else:
             logger.error(f"Not support target: {target}")
         if latency == 0:

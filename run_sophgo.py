@@ -8,6 +8,7 @@ import traceback
 import tarfile
 import hashlib
 import yaml
+import time
 import sqlalchemy
 import pymysql
 import resource
@@ -127,11 +128,11 @@ def gen_data(filename):
         return False, msg
 
 
-def build_model(filename, md5_code, target, num_core=1):
+def build_model(filename, md5_code, target, num_core, toolkit_version):
     try:
         basename, ext = os.path.splitext(filename)
         mlir = f"{basename}.mlir"
-        if not os.path.exists(mlir):
+        if not os.path.exists(mlir) or 1:
             # get input shapes
             with open("dataset.txt", "r") as f:
                 lines = f.readlines()
@@ -167,7 +168,7 @@ def build_model(filename, md5_code, target, num_core=1):
     
     try:
         cali_table = f"{basename}_cali_table"
-        if not os.path.exists(cali_table):
+        if not os.path.exists(cali_table) or 1:
             cmd = f"run_calibration {basename}.mlir --data_list dataset.txt --input_num 1 -o {cali_table}"
             logger.info(cmd)
             run_calibration_cmd = ["run_calibration", f"{basename}.mlir", "--data_list", "dataset.txt", "--input_num", "1", "-o", cali_table]
@@ -194,8 +195,8 @@ def build_model(filename, md5_code, target, num_core=1):
         return False, msg
     
     try:   
-        bmodel = f"{basename}_{target}_{num_core}core_int8_sym_{md5_code}.bmodel"
-        if not os.path.exists(bmodel):
+        bmodel = f"{basename}_{target}_{num_core}core_int8_sym_v{toolkit_version}_{md5_code}.bmodel"
+        if not os.path.exists(bmodel) or 1:
             cmd = f"model_deploy --mlir {basename}.mlir --quantize INT8 --calibration_table {basename}_cali_table --processor {target} --num_core {num_core} --model {bmodel}"
             logger.info(cmd)
             model_deploy_cmd = ["model_deploy", "--mlir", f"{basename}.mlir", "--quantize", "INT8", "--calibration_table", f"{basename}_cali_table", "--processor", target, "--num_core", str(num_core), "--model", bmodel]
@@ -219,15 +220,15 @@ def build_model(filename, md5_code, target, num_core=1):
         return False, msg
     
 
-def get_latency(filename, md5_code, target, num_core):
+def get_latency(filename, md5_code, target, num_core, toolkit_version):
     basename, ext = os.path.splitext(filename)
-    ip_addr = "192.168.33.35"
+    ip_addr = "192.168.33.247"
     username = "linaro"
     password = "linaro"
     remote_work_dir = "/home/linaro/"
     key_filename = "/root/.ssh/id_rsa"
     num_iter = 1000
-    bmodel = f"{basename}_{target}_{num_core}core_int8_sym_{md5_code}.bmodel"
+    bmodel = f"{basename}_{target}_{num_core}core_int8_sym_v{toolkit_version}_{md5_code}.bmodel"
     remote_model_path = f"/home/linaro/{bmodel}"
     try:
         with Connection(host=f"{username}@{ip_addr}", connect_kwargs={"key_filename": key_filename}) as c:
@@ -261,6 +262,7 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Model build tool")
     parser.add_argument("--models", "-m", type=str, required=True, help="Please specify a onnx model dir")
     parser.add_argument("--target", "-t", type=str, required=True, choices=("bm1688", "bm1684"), help="Please specify a chip target")
+    parser.add_argument("--num_core", "-c", type=int, required=False, default=1, choices=(2, 1), help="Please specify a num core, 2 only for bm1688")
     parser.add_argument("--desc", "-d", type=str, required=True, help="Please specify a task desc")
     args = parser.parse_args()
     
@@ -274,7 +276,9 @@ if __name__ == "__main__":
     models_dir = args.models
     target = args.target
     desc = args.desc
-    num_cores = [1, 2] if target == "bm1688" else [1]
+    num_core = args.num_core
+    if num_core == 2: 
+        assert target == "bm1688", "num_core2 only for bm1688"
     toolkit_version = get_package_version("tpu_mlir")
     logger.info(f"Toolkit Version: {toolkit_version}")
     work_dir = f"outputs/{target}/{toolkit_version}"
@@ -290,104 +294,107 @@ if __name__ == "__main__":
         md5_code = get_md5_code(filepath)
         filename = os.path.basename(filepath)
         basename, ext = os.path.splitext(filename)
-        for num_core in num_cores:
-            model_dir = f"{work_dir}/{basename}_{md5_code}/"
-            if not os.path.exists(model_dir):
-                os.makedirs(model_dir)
-            if not os.path.exists(os.path.join(model_dir, filename)):
-                shutil.copy(filepath, model_dir)
-            bmodel = f"{basename}_{target}_{num_core}core_int8_sym_{md5_code}.bmodel"
-            # 检查该模型已经在数据库
-            res = session.query(Models).filter(
-                Models.md5_code == md5_code,
-                Models.version == toolkit_version,
-                Models.target == target,
-                Models.num_core == num_core
-            ).first()
-            if res:
-                if res.model_path == filepath:
-                    logger.info(f"MD5: {md5_code}, Path: {filepath}")
-                    if bmodel in  ["detr_op11_900x1600_bm1688_2core_int8_sym_583397d68579a08f7cef3d710c5af7e0.bmodel",
-                                   "detr_r50_8x2_150e_coco_bm1688_2core_int8_sym_7813210d45ccc0f6925ee0d1c79698f8.bmodel",
-                                   "fastbev_m0_r18_s256x704_v200x200x4_c192_d2_f4_P3_demo_post_bm1688_2core_int8_sym_e81155ab869ec43a42906db6975bb906.bmodel"]:
-                        continue
-                    if os.path.exists(os.path.join(model_dir, bmodel)) and res.latency == 0:
-                        old_dir = os.getcwd()
-                        os.chdir(model_dir)
-                        # 模型编译生成，但是远程板子推理失败
-                        latency, msg = get_latency(filename, md5_code, target, num_core)
-                        if latency != 0:
-                            res.msg = "ok"
-                            res.latency = latency
-                        else:
-                            res.msg = msg
-                        os.chdir(old_dir)
-                        session.add(res)
-                        session.commit()
-                else:
-                    # 路径不一致，直接复制
-                    model = Models()
-                    model.desc = desc
-                    model.model_name = filename
-                    model.model_path = filepath
-                    model.md5_code = md5_code
-                    model.version = toolkit_version
-                    model.target = target
-                    model.build_time = res.build_time
-                    model.build_span = res.build_span
-                    model.compiled_model_path = res.compiled_model_path
-                    model.compiled_model_md5 = res.compiled_model_md5
-                    model.num_core = res.num_core
-                    model.msg = res.msg
-                    model.latency = res.latency
-                    session.add(model)
+        model_dir = f"{work_dir}/{basename}_{md5_code}/"
+        if not os.path.exists(model_dir):
+            os.makedirs(model_dir)
+        if not os.path.exists(os.path.join(model_dir, filename)):
+            shutil.copy(filepath, model_dir)
+        bmodel = f"{basename}_{target}_{num_core}core_int8_sym_v{toolkit_version}_{md5_code}.bmodel"
+        # 检查该模型已经在数据库
+        res = session.query(Models).filter(
+            Models.md5_code == md5_code,
+            Models.version == toolkit_version,
+            Models.target == target,
+            Models.num_core == num_core
+        ).first()
+        if res:
+            if res.model_path == filepath:
+                logger.info(f"MD5: {md5_code}, Path: {filepath}")
+                if bmodel in  ["detr_op11_900x1600_bm1688_2core_int8_sym_583397d68579a08f7cef3d710c5af7e0.bmodel",
+                               "detr_r50_8x2_150e_coco_bm1688_2core_int8_sym_7813210d45ccc0f6925ee0d1c79698f8.bmodel",
+                               "fastbev_m0_r18_s256x704_v200x200x4_c192_d2_f4_P3_demo_post_bm1688_2core_int8_sym_e81155ab869ec43a42906db6975bb906.bmodel",
+                               "retinanet_r50_fpn_2x_coco_bm1688_2core_int8_sym_28b1212f7dbc94897003d6bbda117843.bmodel",
+                               "ssdlite_mobilenetv2_bm1688_2core_int8_sym_989409e563636c45bb2b5119838ce3fe.bmodel",
+                               "yolov7-tiny-nms_bm1688_2core_int8_sym_fd051394ecd2ee18c96296e33caa6573.bmodel",
+                               "yolov7-tiny-nms_bm1688_1core_int8_sym_fd051394ecd2ee18c96296e33caa6573.bmodel"]:
+                    continue
+                if os.path.exists(os.path.join(model_dir, bmodel)) and res.latency == 0:
+                    old_dir = os.getcwd()
+                    os.chdir(model_dir)
+                    # 模型编译生成，但是远程板子推理失败
+                    latency, msg = get_latency(filename, md5_code, target, num_core, toolkit_version)
+                    if latency != 0:
+                        res.msg = "ok"
+                        res.latency = latency
+                    else:
+                        res.msg = msg
+                    os.chdir(old_dir)
+                    session.add(res)
                     session.commit()
-                continue
-        
-            model = Models()
-            model.desc = desc
-            model.model_name = filename
-            model.model_path = filepath
-            model.md5_code = md5_code
-            model.version = toolkit_version
-            build_time = datetime.now()
-            model.build_time = build_time
-            model.num_core = num_core
-            model.target = target
-
-            old_dir = os.getcwd()
-            os.chdir(model_dir)
-            logger.info(f"Change work dir to {model_dir}")
-            logger.info("Generate random data for quantization")
-            success, msg = gen_data(filename)       
-            if not success:
-                os.chdir(old_dir)
-                model.msg = msg
+            else:
+                # 路径不一致，直接复制
+                model = Models()
+                model.desc = desc
+                model.model_name = filename
+                model.model_path = filepath
+                model.md5_code = md5_code
+                model.version = toolkit_version
+                model.target = target
+                model.build_time = res.build_time
+                model.build_span = res.build_span
+                model.compiled_model_path = res.compiled_model_path
+                model.compiled_model_md5 = res.compiled_model_md5
+                model.num_core = res.num_core
+                model.msg = res.msg
+                model.latency = res.latency
                 session.add(model)
                 session.commit()
-                continue
-            success, msg = build_model(filename, md5_code, target, num_core)
-            if not success:
-                os.chdir(old_dir)
-                model.msg = msg
-                session.add(model)
-                session.commit()
-                continue
-            model.build_span = int(datetime.timestamp(datetime.now()) - datetime.timestamp(build_time))
-            session.add(model)
-            session.commit()
-            latency, msg = get_latency(filename, md5_code, target, num_core)
-            if latency == 0:
-                os.chdir(old_dir)
-                model.msg = msg
-                session.add(model)
-                session.commit()
-                continue
+            continue
+    
+        model = Models()
+        model.desc = desc
+        model.model_name = filename
+        model.model_path = filepath
+        model.md5_code = md5_code
+        model.version = toolkit_version
+        build_time = datetime.now()
+        model.build_time = build_time
+        model.num_core = num_core
+        model.target = target
+        old_dir = os.getcwd()
+        os.chdir(model_dir)
+        logger.info(f"Change work dir to {model_dir}")
+        logger.info("Generate random data for quantization")
+        success, msg = gen_data(filename)       
+        if not success:
             os.chdir(old_dir)
-            compiled_model_path = os.path.join(model_dir, bmodel)
-            model.compiled_model_path = compiled_model_path
-            model.compiled_model_md5 = get_md5_code(compiled_model_path)
-            model.latency = latency
-            model.msg = "ok"
+            model.msg = msg
             session.add(model)
             session.commit()
+            continue
+        if not os.path.exists(bmodel) or 1:
+            t_start = time.time()
+            success, msg = build_model(filename, md5_code, target, num_core, toolkit_version)
+            span = time.time() - t_start
+            model.build_span = str(int(span))
+            if not success:
+                os.chdir(old_dir)
+                model.msg = msg
+                session.add(model)
+                session.commit()
+                continue
+        latency, msg = get_latency(filename, md5_code, target, num_core, toolkit_version)
+        if latency == 0:
+            os.chdir(old_dir)
+            model.msg = msg
+            session.add(model)
+            session.commit()
+            continue
+        os.chdir(old_dir)
+        compiled_model_path = os.path.join(model_dir, bmodel)
+        model.compiled_model_path = compiled_model_path
+        model.compiled_model_md5 = get_md5_code(compiled_model_path)
+        model.latency = latency
+        model.msg = "ok"
+        session.add(model)
+        session.commit()
