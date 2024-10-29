@@ -452,7 +452,7 @@ def display_message(cell1, cell2, cell3, cell4, n_clicks, is_open):
     
 
 @app.callback(
-    Output("edgex", "rowData"),
+    Output("edgex-grid", "rowData"),
     [Input("update_edgex", "n_intervals")]  # 添加分页输入
 )
 def update_edgex(n_intervals):
@@ -460,7 +460,7 @@ def update_edgex(n_intervals):
 
 
 @app.callback(
-    Output("axera", "rowData"),
+    Output("axera-grid", "rowData"),
     [Input("update_axera", "n_intervals")]  # 添加分页输入
 )
 def update_axera(n_intervals):
@@ -468,7 +468,7 @@ def update_axera(n_intervals):
 
 
 @app.callback(
-    Output("sophgo", "rowData"),
+    Output("sophgo-grid", "rowData"),
     [Input("update_sophgo", "n_intervals")]  # 添加分页输入
 )
 def update_sophgo(n_intervals):
@@ -476,7 +476,7 @@ def update_sophgo(n_intervals):
 
 
 @app.callback(
-    Output("rockchip", "rowData"),
+    Output("rockchip-grid", "rowData"),
     [Input("update_rockchip", "n_intervals")]  # 添加分页输入
 )
 def update_rockchip(n_intervals):
