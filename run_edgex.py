@@ -72,7 +72,7 @@ def build():
     try:
         logger.info("python /DEngine/tyassist/tyassist.py build -c config.yml")
         build_cmd = ["python", "/DEngine/tyassist/tyassist.py", "build", "-c", "config.yml"]
-        res = subprocess.run(build_cmd, capture_output=True, text=True, check=True, timeout=7200)  # 2小时不结束视为超时
+        res = subprocess.run(build_cmd, capture_output=True, text=True, check=True, timeout=6*3600)  # 6小时不结束视为超时
         if res.returncode == 0:
             logger.info(f"success:\n {res.stdout}")
             return True, "ok"
