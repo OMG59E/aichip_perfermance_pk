@@ -291,7 +291,7 @@ def get_latency(filename, md5_code, target, num_core, mode, toolkit_version):
             c.run(f"rm {remote_model_path}", hide=True)
         msg = f"Run model exception, and delete remote model: {remote_model_path}:\n{traceback.format_exc()}"
         logger.error(msg)
-        return 0, msg
+        return 0, 0, 0, msg
 
 
 if __name__ == "__main__":
@@ -320,7 +320,7 @@ if __name__ == "__main__":
         assert target == "bm1688", "num_core2 only for bm1688"
     toolkit_version = str(get_package_version("tpu_mlir"))
     logger.info(f"Toolkit Version: {toolkit_version}")
-    work_dir = f"outputs/{target}/{toolkit_version}"
+    work_dir = f"outputs/{target}/{toolkit_version}/v2.5.5"
     if not os.path.exists(work_dir):
         os.makedirs(work_dir)
     onnx_files = glob.glob(os.path.join(models_dir, "**/*.onnx"), recursive=True)
@@ -375,7 +375,7 @@ if __name__ == "__main__":
                 model.build_time = res.build_time
                 model.transform_span = res.transform_span
                 model.calibration_span = res.calibration_span
-                model.deploy_span = res.deploy_1core_span
+                model.deploy_span = res.deploy_span
                 model.compiled_model_path = res.compiled_model_path
                 model.compiled_model_md5 = res.compiled_model_md5
                 model.msg = res.msg
