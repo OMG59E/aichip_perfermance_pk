@@ -61,6 +61,8 @@ class Models(Base):
     build_time = Column(DateTime, comment="编译时间")
     span = Column(String(512), comment="编译耗时")
     latency = Column(Float, default=0, comment="单位毫秒")
+    ddr_r = Column(Float, default=0, comment="DDR读带宽 单位MB/s")
+    ddr_w = Column(Float, default=0, comment="DDR写带宽 单位MB/s")
     compiled_model_path = Column(String(512), comment="编译后模型路径")
     compiled_model_md5 = Column(String(512), comment="编译后模型MD5")
     
@@ -151,9 +153,9 @@ def build_model(filename, md5_code, target, toolkit_version):
 
 def get_latency(filename, md5_code, target, toolkit_version):
     basename, ext = os.path.splitext(filename)
-    ip_addr = "192.168.13.115"
+    ip_addr = "192.168.33.247"
     username = "root"
-    password = "123"
+    password = " "
     remote_work_dir = "/root/"
     key_filename = "/root/.ssh/id_rsa"
     num_iter = 100
@@ -191,7 +193,7 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Model build tool")
     parser.add_argument("type", type=str, choices=("build", "copy"), help="Please specify a operator")
     parser.add_argument("--models", "-m", type=str, required=True, help="Please specify a onnx model dir")
-    parser.add_argument("--target", "-t", type=str, required=True, choices=("Ascend310", "Ascend710"), help="Please specify a chip target")
+    parser.add_argument("--target", "-t", type=str, required=True, choices=("Ascend310", "Ascend310B1", "Ascend310P3"), help="Please specify a chip target")
     parser.add_argument("--desc", "-d", type=str, required=False if "copy" in sys.argv else True, help="Please specify a task desc")
     parser.add_argument("--output", "-o", type=str, required=True if "copy" in sys.argv else False, help="Please specify a output path")
     args = parser.parse_args()
@@ -279,7 +281,13 @@ if __name__ == "__main__":
             session.add(model)
             session.commit()
             continue
-
+        if not os.path.exists(f"{basename}.om"):
+            os.chdir(old_dir)
+            model.msg = "build failed"
+            session.add(model)
+            session.commit()
+            continue 
+        
         # 编译成功后，更新编译时间
         build_info_file = "build_info.json"
         if os.path.exists(build_info_file):

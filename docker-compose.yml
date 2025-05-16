@@ -8,6 +8,8 @@ services:
     restart: always
     privileged: true
     tty: true
+    ports:
+      - 8122:22
     environment:
       - NNP=nnp400
       - LD_LIBRARY_PATH=/DEngine/tyhcp/client/x64-linux-gcc7.5/lib:/DEngine/tydpf/client/x64-linux-gcc7.5/lib
@@ -22,7 +24,29 @@ services:
       - /dato/xingwg/modelzoo:/DEngine/tyexamples/modelzoo
       - /dato/xingwg/models:/DEngine/models
       - /data/xingwg/gdino_lst:/gdino_lst
-        
+
+  edgex_release:
+    image: 113.100.143.90:8091/dengine/dengine:v0.12
+    hostname: edgex
+    container_name: edgex_release
+    restart: always
+    privileged: true
+    tty: true
+    environment:
+      - NNP=nnp400
+      - LD_LIBRARY_PATH=/DEngine/tyhcp/client/x64-linux-gcc7.5/lib:/DEngine/tydpf/client/x64-linux-gcc7.5/lib
+      - ARM_C_COMPILER=/DEngine/toolchains/gcc-arm-9.2-2019.12-x86_64-aarch64-none-linux-gnu/bin/aarch64-none-linux-gnu-gcc
+    working_dir: /DEngine
+    devices:
+      - /dev:/dev
+    volumes:
+      - /dato/xingwg/DEngine_edge10:/DEngine
+      - /dato/xingwg/tyassist:/DEngine/tyassist
+      - /dato/xingwg/tymodelzoo:/DEngine/tymodelzoo
+      - /dato/xingwg/modelzoo:/DEngine/tyexamples/modelzoo
+      - /dato/xingwg/models:/DEngine/models
+      - /data/xingwg/gdino_lst:/gdino_lst
+
   tytvm:
     image: 113.100.143.90:8091/dengine/tytvm:v0.36
     hostname: tytvm_nnp300
@@ -184,7 +208,7 @@ services:
     working_dir: /models
     volumes:
       - /dato/xingwg/models:/models
-      
+
   mysql:
     image: mysql:8.2.0
     restart: always
@@ -222,3 +246,4 @@ services:
     volumes:
       - /dato/xingwg/models:/models
       - /dato/xingwg/tymodelzoo/data:/data
+      

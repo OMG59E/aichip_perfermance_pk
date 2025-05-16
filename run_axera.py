@@ -161,12 +161,12 @@ def gen_data(filename):
     
 
 def get_latency(model_name):
-    ip_addr = "192.168.33.70"
+    ip_addr = "192.168.33.50"
     username = "root"
     password = "root"
     remote_work_dir = "/root/"
     key_filename = "/root/.ssh/id_rsa"
-    num_iter = 1000
+    num_iter = 100
     remote_model_path = os.path.join(remote_work_dir, model_name)
     try:
         with Connection(host=f"{username}@{ip_addr}", connect_kwargs={"key_filename": key_filename}) as c:

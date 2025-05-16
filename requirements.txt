@@ -15,3 +15,11 @@ fabric
 loguru
 onnxsim
 xlsxwriter
+attrs
+psutil
+absl-py
+scipy
+sympy
+pyyaml
+onnxsim
+onnxruntime

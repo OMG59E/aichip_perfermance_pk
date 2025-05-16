@@ -425,10 +425,10 @@ def download_filtered_data(n_clicks, axera_data, sophgo_data, rockchip_data, edg
 @app.callback(
     Output("modal", "is_open"),
     Output("modal-body", "children"),
-    Input("axera", "cellClicked"),
-    Input("sophgo", "cellClicked"),
-    Input("rockchip", "cellClicked"),
-    Input("edgex", "cellClicked"),
+    Input("axera-grid", "cellClicked"),
+    Input("sophgo-grid", "cellClicked"),
+    Input("rockchip-grid", "cellClicked"),
+    Input("edgex-grid", "cellClicked"),
     Input("close", "n_clicks"),
     State("modal", "is_open"),
 )
@@ -439,15 +439,15 @@ def display_message(cell1, cell2, cell3, cell4, n_clicks, is_open):
         return is_open, ""
     trigger_id = ctx.triggered[0]["prop_id"].split(".")[0]
     cell = None
-    if trigger_id == "axera":
+    if trigger_id == "axera-grid":
         cell = cell1
-    if trigger_id == "sophgo":
+    if trigger_id == "sophgo-grid":
         cell = cell2
-    if trigger_id == "rockchip":
+    if trigger_id == "rockchip-grid":
         cell = cell3
-    if trigger_id == "edgex":
+    if trigger_id == "edgex-grid":
         cell = cell4
-    if (trigger_id in ["axera", "sophgo", "rockchip", "edgex"] and cell and cell["colId"] == "MSG"):
+    if (trigger_id in ["axera-grid", "sophgo-grid", "rockchip-grid", "edgex-grid"] and cell and cell["colId"] == "MSG"):
         msg_content = cell["value"]
         return True, html.Pre(msg_content, style={"whiteSpace": "pre-wrap", "fontSize": "14px"})
     if trigger_id == "close" and n_clicks:

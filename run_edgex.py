@@ -11,6 +11,7 @@ import hashlib
 import sqlalchemy
 import pymysql
 import onnx
+import traceback
 import onnx_graphsurgeon as gs
 from loguru import logger
 from natsort import natsorted
@@ -42,7 +43,7 @@ Base = declarative_base(engine)
 
 
 class EdgeXTable(Base):
-    __tablename__ = "edgex2"
+    __tablename__ = "edgex3"
     __table_args__ = {"extend_existing": True, "mysql_charset": "utf8"}
     id = Column(Integer, primary_key=True, autoincrement=True)
     desc = Column(String(512), comment="任务描述")
@@ -65,7 +66,7 @@ class EdgeXTable(Base):
     throughput_2t = Column(Float, default=0, comment="2线程推理吞吐")
     throughput_3t = Column(Float, default=0, comment="3线程推理吞吐")
     throughput_4t = Column(Float, default=0, comment="4线程推理吞吐")
-    costmodel_latency = Column(Float, default=0, comment="cost model时延(毫秒)")
+    costmodel_latency = Column(String(512), default="0", comment="cost model时延(毫秒)")
     compiled_model_path = Column(String(512), comment="编译后模型路径")
     compiled_model_md5 = Column(String(512), comment="编译后模型MD5")
 
@@ -116,7 +117,7 @@ def run_profile():
     
 
 def run_latency(model_path, num_thread):
-    ip_addr = "192.168.33.239"
+    ip_addr = "192.168.33.61"
     username = "root"
     password = "root"
     remote_work_dir = "/root/"
@@ -140,7 +141,7 @@ def run_latency(model_path, num_thread):
             output = result.stdout.strip()
             logger.info(f"Command Output:\n{output}")
             lines = output.splitlines()
-            line_list = lines[-5].split(" ")
+            line_list = lines[-4].split(" ")
             latency = float(line_list[-3][:-3])
             throughput = float(line_list[-1])
             logger.info(f"Exit Code: {result.return_code}")
@@ -266,6 +267,7 @@ if __name__ == "__main__":
     parser.add_argument("--num_cube", "-c", type=int, required=False, default=3, choices=(3, 2), help="Please specify a num_cube")
     parser.add_argument("--desc", "-d", type=str, required=True, help="Please specify a task desc")
     parser.add_argument("--output", "-s", type=str, required=True if "copy" in sys.argv else False, help="Please specify a output path")
+    parser.add_argument("--transformer", action="store_true")
     args = parser.parse_args()
 
     # 检查表是否存在
@@ -281,7 +283,8 @@ if __name__ == "__main__":
     num_cube = args.num_cube
     desc = args.desc
     run_type = args.type
-    toolkit_version = "1.0.1"
+    toolkit_version = "1.0.4"
+    is_transformer = args.transformer
     logger.info(f"Toolkit Version: {toolkit_version}")
     
     work_dir = f"outputs/edgex/{target}/{toolkit_version}"
@@ -367,7 +370,7 @@ if __name__ == "__main__":
         os.chdir(model_dir)
         logger.info(f"Change work dir to {model_dir}")
         logger.info("Generate default config file")
-        success, msg = gen_cfg(filename, md5_code, target, opt_level, num_cube, toolkit_version)
+        success, msg = gen_cfg(filename, md5_code, target, opt_level, num_cube, toolkit_version, is_transformer)
         if not success:
             os.chdir(old_dir)
             model.msg = msg
@@ -414,7 +417,7 @@ if __name__ == "__main__":
         model.compiled_model_md5 = get_md5_code(compiled_model_path)
         model.build_span = "{:.2f}".format(build_info["build_span"])
         model.quantization_span = "{:.2f}".format(build_info["quantization_span"])
-        model.costmodel_latency = "{:.3f}".format(prof["cost_model"])
+        model.costmodel_latency = "{}".format(prof["cost_model"])
         
         latency, throughput, msg = run_latency(compiled_model_path, 1)
         if msg == "ok":

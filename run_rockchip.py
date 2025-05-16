@@ -417,24 +417,24 @@ if __name__ == "__main__":
                 continue
         else:
             model.build_span = 0
-        if target == "rk3588":
-            if rknn_name not in ["ch_PP-OCRv2_rec_infer_b1_rk3588_v2.1.0+708089d1_0ef3605e78c0329c54305f2454e4bcfc.rknn"]:
-                latency_1core, latency, throughput, msg = get_latency_throughput(rknn_name)
-                model.latency_1core = latency_1core
-                model.latency = latency
-                model.throughput = throughput
-            else:
-                logger.error(f"Skip: {rknn_name}")
-                os.chdir(old_dir)
-                continue
-        else:
-            logger.error(f"Not support target: {target}")
-        if latency == 0:
-            os.chdir(old_dir)
-            model.msg = msg
-            session.add(model)
-            session.commit()
-            continue
+        # if target == "rk3588":
+        #     if rknn_name not in ["ch_PP-OCRv2_rec_infer_b1_rk3588_v2.1.0+708089d1_0ef3605e78c0329c54305f2454e4bcfc.rknn"]:
+        #         latency_1core, latency, throughput, msg = get_latency_throughput(rknn_name)
+        #         model.latency_1core = latency_1core
+        #         model.latency = latency
+        #         model.throughput = throughput
+        #     else:
+        #         logger.error(f"Skip: {rknn_name}")
+        #         os.chdir(old_dir)
+        #         continue
+        # else:
+        #     logger.error(f"Not support target: {target}")
+        # if latency == 0:
+        #     os.chdir(old_dir)
+        #     model.msg = msg
+        #     session.add(model)
+        #     session.commit()
+        #     continue
         os.chdir(old_dir)
         compiled_model_path = os.path.join(model_work_dir, relative_model_path)
         model.compiled_model_path = compiled_model_path

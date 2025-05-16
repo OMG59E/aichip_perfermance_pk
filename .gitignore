@@ -2,3 +2,15 @@ db
 onnx
 release
 outputs
+*.bmodel
+*.ty
+*.rknn
+*.axmodel
+test
+modelzoo
+*.so*
+*.om
+ezviz_models
+llm_models
+2025KJB
+huaw_models

@@ -45,7 +45,7 @@ session = Session()
 Base = declarative_base(engine)
     
 class Models(Base):
-    __tablename__ = "sophgo"
+    __tablename__ = "shiyuan"
     __table_args__ = {"extend_existing": True, "mysql_charset": "utf8"}
     id = Column(Integer, primary_key=True, autoincrement=True)
     desc = Column(String(512), comment="任务描述")
@@ -99,7 +99,7 @@ def get_package_version(package_name):
         return f"Package {package_name} is not installed."
     
     
-def gen_data(filename):
+def gen_data(filename, batch_size=1):
     try:
         # 检查onnx是否仅为batch维度动态
         graph = gs.import_onnx(onnx.load(filename))
@@ -110,7 +110,7 @@ def gen_data(filename):
         for idx, input_name in enumerate(input_names):
             shape = input_shapes[idx]
             if not isinstance(shape[0], int) or shape[0] < 1:
-                shape[0] = 1
+                shape[0] = batch_size
             if len(shape) >= 2:
                 for d in range(1, len(shape)):
                     if not isinstance(shape[d], int) or shape[d] < 1:
@@ -255,7 +255,7 @@ def build_model(filename, md5_code, target, num_core, toolkit_version):
 
 def get_latency(filename, md5_code, target, num_core, mode, toolkit_version):
     basename, ext = os.path.splitext(filename)
-    ip_addr = "192.168.33.247"
+    ip_addr = "192.168.33.239"
     username = "linaro"
     password = "linaro"
     remote_work_dir = "/home/linaro/"
@@ -302,6 +302,7 @@ if __name__ == "__main__":
     parser.add_argument("--num_core", "-c", type=int, required=False, default=1, choices=(2, 1), help="Please specify a num core, 2 only for bm1688")
     parser.add_argument("--desc", "-d", type=str, required=False if "copy" in sys.argv else True, help="Please specify a task desc")
     parser.add_argument("--output", "-o", type=str, required=True if "copy" in sys.argv else False, help="Please specify a output path")
+    parser.add_argument("--batch", "-b", type=int, required=True, default=1, help="Please specify a output path")
     args = parser.parse_args()
     
     # 检查表是否存在
@@ -316,11 +317,12 @@ if __name__ == "__main__":
     desc = args.desc
     num_core = args.num_core
     run_type = args.type
+    batch_size = args.batch
     if num_core == 2: 
         assert target == "bm1688", "num_core2 only for bm1688"
     toolkit_version = str(get_package_version("tpu_mlir"))
     logger.info(f"Toolkit Version: {toolkit_version}")
-    work_dir = f"outputs/{target}/{toolkit_version}/v2.5.5"
+    work_dir = f"outputs/{target}/{toolkit_version}"
     if not os.path.exists(work_dir):
         os.makedirs(work_dir)
     onnx_files = glob.glob(os.path.join(models_dir, "**/*.onnx"), recursive=True)
@@ -333,7 +335,7 @@ if __name__ == "__main__":
         md5_code = get_md5_code(filepath)
         filename = os.path.basename(filepath)
         basename, ext = os.path.splitext(filename)
-        model_dir = f"{work_dir}/{basename}_{md5_code}/"
+        model_dir = f"{work_dir}/b{batch_size}_{basename}_{md5_code}/"
         if not os.path.exists(model_dir):
             os.makedirs(model_dir)
         if not os.path.exists(os.path.join(model_dir, filename)):
@@ -358,6 +360,7 @@ if __name__ == "__main__":
             Models.version == toolkit_version,
             Models.target == target,
             Models.num_core == num_core,
+            Models.batch_size == batch_size,
         ).first()
         if res:
             if res.model_path == filepath:
@@ -372,6 +375,7 @@ if __name__ == "__main__":
                 model.version = toolkit_version
                 model.target = target
                 model.num_core = num_core
+                model.batch_size = batch_size
                 model.build_time = res.build_time
                 model.transform_span = res.transform_span
                 model.calibration_span = res.calibration_span
@@ -405,11 +409,12 @@ if __name__ == "__main__":
         model.build_time = build_time
         model.target = target
         model.num_core = num_core
+        model.batch_size = batch_size
         old_dir = os.getcwd()
         os.chdir(model_dir)
         logger.info(f"Change work dir to {model_dir}")
         logger.info("Generate random data for quantization")
-        success, msg = gen_data(filename) 
+        success, msg = gen_data(filename, batch_size=batch_size) 
         if not success:
             os.chdir(old_dir)
             model.msg = msg
